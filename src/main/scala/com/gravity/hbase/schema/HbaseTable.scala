@@ -10,9 +10,13 @@ import org.apache.hadoop.hbase.util.Bytes.ByteArrayComparator
 import java.io.IOException
 import org.apache.hadoop.conf.Configuration
 import java.util.Arrays
-import org.apache.hadoop.hbase.{HColumnDescriptor, KeyValue}
+import org.apache.hadoop.hbase._
 import scala.Int
 import org.apache.hadoop.hbase.client._
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable
+import com.gravity.hbase.schema.DeserializedResult
+import scala.Some
+import com.gravity.hbase.schema.HbaseTableConfig
 
 /*             )\._.,--....,'``.
  .b--.        /;   _.. \   _\  (`._ ,.
@@ -50,7 +54,6 @@ object HbaseTable {
  */
 abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val tableName: String, var cache: QueryResultCache[T, R, RR] = new NoOpCache[T, R, RR](), rowKeyClass: Class[R], logSchemaInconsistencies: Boolean = false, tableConfig:HbaseTableConfig = HbaseTable.defaultConfig)(implicit conf: Configuration, keyConverter: ByteConverter[R]) {
 
-  def asyncClient = AsyncClient.client(conf)
 
   def rowBuilder(result: DeserializedResult): RR
 
@@ -132,92 +135,12 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
 
   }
 
-  /**
-   * Converts an AsynchBase result to an HPaste result.
-   * @param rowId The rowid is passed in because unlike Hbase's standard client, AsynchBase does not return the rowid back.
-   * @param result For AsynchBase the result is an ArrayList of Byte arrays.
-   * @return
-   */
-  def convertResultAsync(rowId:Array[Byte],result: Seq[org.hbase.async.KeyValue]) : DeserializedResult = {
-    val r = keyConverter.fromBytes(rowId).asInstanceOf[AnyRef]
-    val ds = new DeserializedResult(r, families.size)
-    var itr = 0
-    while(itr < result.length) {
-      val kv = result(itr)
-      val family = kv.family()
-      val key = kv.qualifier()
-      try {
-        val c = converterByBytes(family, key)
-        if (c == null) {
-          if (logSchemaInconsistencies) {
-            println("Table: " + tableName + " : Null Converter : " + Bytes.toString(kv.family()))
-          }
-        }
-        else if (!c.keyConverter.isInstanceOf[AnyConverterSignal] && !c.valueConverter.isInstanceOf[AnyConverterSignal]) {
-          val f = c.family
-          val k = c.keyConverter.fromBytes(key).asInstanceOf[AnyRef]
-          val r = c.valueConverter.fromBytes(kv.value()).asInstanceOf[AnyRef]
-          val ts = kv.timestamp()
 
-          ds.add(f, k, r, ts)
-        } else {
-          if (logSchemaInconsistencies) {
-            println("Table: " + tableName + " : Any Converter : " + Bytes.toString(kv.family()))
-          }
-          //TODO: Just like AnyNotSupportException, add a counter here because this means a column was removed, but the data is still in the database.
-        }
-      } finally {
-        itr = itr + 1
-      }
-    }
-    ds
-  }
   /**Converts a result to a DeserializedObject. A conservative implementation that is slower than convertResultRaw but will always be more stable against
    * binary changes to Hbase's KeyValue format.
    */
   def convertResult(result: Result) = {
-    if (result.isEmpty) {
-      throw new RuntimeException("Attempting to deserialize an empty result.  If you want to handle the eventuality of an empty result, call singleOption() instead of single()")
-    }
-    val keyValues = result.raw()
-    val buff = result.getBytes.get()
-
-    val rowId = keyConverter.fromBytes(buff, keyValues(0).getRowOffset, keyValues(0).getRowLength).asInstanceOf[AnyRef]
-
-    val ds = DeserializedResult(rowId, families.size)
-
-    var itr = 0
-
-    while (itr < keyValues.length) {
-      val kv = keyValues(itr)
-      val family = kv.getFamily
-      val key = kv.getQualifier
-      try {
-        val c = converterByBytes(family, key)
-        if (c == null) {
-          if (logSchemaInconsistencies) {
-            println("Table: " + tableName + " : Null Converter : " + Bytes.toString(kv.getFamily))
-          }
-        }
-        else if (!c.keyConverter.isInstanceOf[AnyConverterSignal] && !c.valueConverter.isInstanceOf[AnyConverterSignal]) {
-          val f = c.family
-          val k = c.keyConverter.fromBytes(buff, kv.getQualifierOffset, kv.getQualifierLength).asInstanceOf[AnyRef]
-          val r = c.valueConverter.fromBytes(buff, kv.getValueOffset, kv.getValueLength).asInstanceOf[AnyRef]
-          val ts = kv.getTimestamp
-
-          ds.add(f, k, r, ts)
-        } else {
-          if (logSchemaInconsistencies) {
-            println("Table: " + tableName + " : Any Converter : " + Bytes.toString(kv.getFamily))
-          }
-          //TODO: Just like AnyNotSupportException, add a counter here because this means a column was removed, but the data is still in the database.
-        }
-      } finally {
-        itr = itr + 1
-      }
-
-    }
-    ds
+    convertResultRaw(result)
   }
 
   /**
@@ -226,62 +149,35 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
    * @return
    */
   def convertResultRaw(result: Result) = {
+    val bytes = new Bytes()
+    val cellValues = result.rawCells();
 
 
-    val bytes = result.getBytes()
-    val buf = bytes.get()
-    var offset = bytes.getOffset
-    val finalOffset = bytes.getSize + offset
-    var row: Array[Byte] = null
+
+
     var ds: DeserializedResult = null
+    val rowId = keyConverter.fromBytes(result.getRow).asInstanceOf[AnyRef]
+    ds = DeserializedResult(rowId, families.size)
 
-    while (offset < finalOffset) {
-      val keyLength = Bytes.toInt(buf, offset)
-      offset = offset + Bytes.SIZEOF_INT
-
-      val keyOffset = offset + KeyValue.ROW_OFFSET
-      val rowLength = Bytes.toShort(buf, keyOffset)
-      val familyOffset = offset + KeyValue.ROW_OFFSET + Bytes.SIZEOF_SHORT + rowLength + Bytes.SIZEOF_BYTE
-      val familyLength = buf(familyOffset - 1)
-      val family = new Array[Byte](familyLength)
-      System.arraycopy(buf, familyOffset, family, 0, familyLength)
-
-      val qualifierOffset = familyOffset + familyLength
-      val qualifierLength = keyLength - (KeyValue.KEY_INFRASTRUCTURE_SIZE + rowLength + familyLength)
-      val key = new Array[Byte](qualifierLength)
-      System.arraycopy(buf, qualifierOffset, key, 0, qualifierLength)
-
-      val valueOffset = keyOffset + keyLength
-      val valueLength = Bytes.toInt(buf, offset + Bytes.SIZEOF_INT)
-      val value = new Array[Byte](valueLength)
-      System.arraycopy(buf, valueOffset, value, 0, valueLength)
-
-      val tsOffset = keyOffset + keyLength - KeyValue.TIMESTAMP_TYPE_SIZE
-      val ts = Bytes.toLong(buf, tsOffset)
-
-      if (row == null) {
-        val rowOffset = keyOffset + Bytes.SIZEOF_SHORT
-        row = new Array[Byte](rowLength)
-        System.arraycopy(buf, rowOffset, row, 0, rowLength)
-        val rowId = keyConverter.fromBytes(result.getRow).asInstanceOf[AnyRef]
-        ds = DeserializedResult(rowId, families.size)
-      }
-
+    for (cell <- cellValues) {
       try {
-        val c = converterByBytes(family, key)
-        val f = c.family
-        val k = c.keyConverter.fromBytes(key).asInstanceOf[AnyRef]
-        val r = c.valueConverter.fromBytes(value).asInstanceOf[AnyRef]
-        println("Adding value " + r)
-        ds.add(f, k, r, ts)
+        val f = CellUtil.cloneFamily(cell)
+        val r = CellUtil.cloneValue(cell)
+        val c = converterByBytes(f,r)
+        val q = CellUtil.cloneQualifier(cell)
+
+        val rNew = c.valueConverter.fromBytes(r, 0, r.length).asInstanceOf[AnyRef]
+        val qNew = c.keyConverter.fromBytes(q, 0, q.length).asInstanceOf[AnyRef]
+
+        val ts = cell.getTimestamp()
+        println("Adding value " + rNew)
+        ds.add(c.family, qNew, rNew, ts)
       } catch {
         case ex: Exception => {
           println("Adding error buffer")
-          ds.addErrorBuffer(family, key, value, ts)
+          //ds.addErrorBuffer(f, k, r, ts)
         }
       }
-
-      offset = offset + keyLength
     }
     ds
   }

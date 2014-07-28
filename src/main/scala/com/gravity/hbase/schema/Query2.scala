@@ -28,7 +28,7 @@ import scala.collection.mutable.Buffer
 import org.apache.hadoop.hbase.filter.FilterList.Operator
 import org.joda.time.{ReadableInstant, DateTime}
 import org.apache.hadoop.hbase.filter._
-import org.hbase.async.GetRequest
+
 
 /*             )\._.,--....,'``.
 .b--.        /;   _.. \   _\  (`._ ,.
@@ -505,23 +505,6 @@ class Query2[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]] private(
 
   def single(tableName: String = table.tableName, ttl: Int = 30, skipCache: Boolean = true) = singleOption(tableName, ttl, skipCache, false).get
 
-  def singleOptionAsync(tableName: String = table.tableName, ttl: Int = 30, skipCache: Boolean = true, noneOnEmpty: Boolean = true): Option[RR] = {
-    require(families.size == 1,"Asynchbase does not allow more than one family to be fetched at a time")
-
-    val gr = new GetRequest(table.tableName, keys.head)
-    gr.family(families.head)
-    val cols = columns.map{column=>
-      require(column._1 == families.head,"Asynchbase does not allow more than one family to be specified in a single request")
-      column._2
-    }.toArray
-    gr.qualifiers(cols)
-
-    val defs = table.asyncClient.get(gr)
-    val kvs = defs.join()
-
-    val desres = table.convertResultAsync(keys.head,kvs)
-    Some(table.rowBuilder(desres))
-  }
 
 
   /**
@@ -637,7 +620,7 @@ class Query2[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]] private(
   }
 
 
-  /**
+  /**si
    * @param tableName
    * @param ttl
    * @param skipCache

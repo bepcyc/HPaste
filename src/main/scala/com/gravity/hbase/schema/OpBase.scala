@@ -4,6 +4,7 @@ import scala.collection.mutable.Buffer
 import org.apache.hadoop.io.Writable
 import org.apache.hadoop.hbase.client.{Increment, Delete, Put}
 import scala.collection.JavaConversions._
+import org.apache.hadoop.hbase.client.Mutation
 
 /*             )\._.,--....,'``.
  .b--.        /;   _.. \   _\  (`._ ,.
@@ -41,8 +42,8 @@ abstract class OpBase[T <: HbaseTable[T, R, _], R](val table: HbaseTable[T, R, _
 
   def size = previous.size
 
-  def getOperations: Iterable[Writable] = {
-    val calls = Buffer[Writable]()
+  def getOperations: Iterable[Mutation] = {
+    val calls = Buffer[Mutation]()
     previous.foreach {
       case put: PutOp[T, R] => {
         calls += put.put
