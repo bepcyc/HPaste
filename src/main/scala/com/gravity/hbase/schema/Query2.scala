@@ -431,10 +431,10 @@ trait MinimumFiltersToExecute[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]] {
 
   def withColumnsInFamily[F, K, V](family: (T) => ColumnFamily[T, R, F, K, V], firstColumn: K, columnList: K*): Query2[T, R, RR]
 
-  @deprecated("withColumnsInFamily can select one or more columns from a single family")
+  @deprecated("withColumnsInFamily can select one or more columns from a single family", "0.1.24")
   def withColumn[F, K, V](family: (T) => ColumnFamily[T, R, F, K, V], columnName: K): Query2[T, R, RR]
 
-  @deprecated("withColumns can select one or more columns")
+  @deprecated("withColumns can select one or more columns", "0.1.24")
   def withColumn[F, K, V](column: (T) => Column[T, R, F, K, V]): Query2[T, R, RR]
 
   def withColumns[F, K, V](firstColumn: (T) => Column[T, R, F, _, _], columnList: ((T) => Column[T, R, F, _, _])*): Query2[T, R, RR]

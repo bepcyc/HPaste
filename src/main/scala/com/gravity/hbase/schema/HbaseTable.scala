@@ -1,22 +1,20 @@
 package com.gravity.hbase.schema
 
 import java.nio.ByteBuffer
-import scala.collection.mutable.ArrayBuffer
-import scala.collection._
-import org.apache.commons.lang.ArrayUtils
-import org.apache.hadoop.hbase.util.Bytes
-import com.gravity.hbase.AnyConverterSignal
-import org.apache.hadoop.hbase.util.Bytes.ByteArrayComparator
 import java.io.IOException
-import org.apache.hadoop.conf.Configuration
 import java.util.Arrays
+
+import scala.collection.mutable.{ ArrayBuffer, Map => MMap }
+
+import org.apache.commons.lang.ArrayUtils
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.hadoop.hbase.util.Bytes.ByteArrayComparator
 import org.apache.hadoop.hbase._
-import scala.Int
 import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable
-import com.gravity.hbase.schema.DeserializedResult
-import scala.Some
-import com.gravity.hbase.schema.HbaseTableConfig
+
+import com.gravity.hbase.AnyConverterSignal
 
 /*             )\._.,--....,'``.
  .b--.        /;   _.. \   _\  (`._ ,.
@@ -278,10 +276,10 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
   private val columns = ArrayBuffer[Column[T, R, _, _, _]]()
   val families = ArrayBuffer[ColumnFamily[T, R, _, _, _]]()
 
-  val columnsByName = mutable.Map[AnyRef, Column[T, R, _, _, _]]()
+  val columnsByName = MMap[AnyRef, Column[T, R, _, _, _]]()
 
-  private val columnsByBytes = mutable.Map[ByteBuffer, KeyValueConvertible[_, _, _]]()
-  private val familiesByBytes = mutable.Map[ByteBuffer, KeyValueConvertible[_, _, _]]()
+  private val columnsByBytes = MMap[ByteBuffer, KeyValueConvertible[_, _, _]]()
+  private val familiesByBytes = MMap[ByteBuffer, KeyValueConvertible[_, _, _]]()
 
   var columnIdx = 0
 
@@ -346,10 +344,10 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
     }
   }
 
-  @deprecated("Use query2 instead, it is a generic interface for gets or scans")
+  @deprecated("Use query2 instead, it is a generic interface for gets or scans", "0.1.24")
   def scan = new ScanQuery(this)
 
-  @deprecated("Use query2 instead")
+  @deprecated("Use query2 instead", "0.1.24")
   def query = new Query(this)
 
   def query2 = new Query2Builder(this)

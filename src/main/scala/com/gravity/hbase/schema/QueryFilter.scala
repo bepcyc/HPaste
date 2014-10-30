@@ -34,7 +34,7 @@ import org.apache.hadoop.hbase.filter.FilterList.Operator
  .b--.        /;   _.. \   _\  (`._ ,.
 `=,-,-'~~~   `----(,_..'--(,_..'`-.;.'  */
 
-@deprecated("Use query2 and filter()")
+@deprecated("Use query2 and filter()", "0.1.24")
 class QueryFilter[T <: HbaseTable[T,R,_],R](table:HbaseTable[T,R,_]) {
   var currentFilter : FilterList = new FilterList(Operator.MUST_PASS_ALL)
 

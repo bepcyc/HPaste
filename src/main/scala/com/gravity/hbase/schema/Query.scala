@@ -34,7 +34,7 @@ import org.joda.time.DateTime
 .b--.        /;   _.. \   _\  (`._ ,.
 `=,-,-'~~~   `----(,_..'--(,_..'`-.;.'  */
 
-@deprecated
+@deprecated("Use query2 instead", "0.1.24")
 class Query[T <: HbaseTable[T, R,RR], R, RR <: HRow[T,R]](table: HbaseTable[T, R, RR]) {
 
   val keys = Buffer[Array[Byte]]()
