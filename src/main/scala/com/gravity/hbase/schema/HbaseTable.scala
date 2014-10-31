@@ -168,7 +168,7 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
         val qNew = c.keyConverter.fromBytes(q, 0, q.length).asInstanceOf[AnyRef]
 
         val ts = cell.getTimestamp()
-        println("Adding value " + rNew)
+        // println("Adding value " + rNew)
         ds.add(c.family, qNew, rNew, ts)
       } catch {
         case ex: Exception => {
