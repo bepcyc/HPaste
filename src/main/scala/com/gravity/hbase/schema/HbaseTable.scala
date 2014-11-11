@@ -173,7 +173,7 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
       } catch {
         case ex: Exception => {
           println("Adding error buffer")
-          //ds.addErrorBuffer(f, k, r, ts)
+          ex.printStackTrace
         }
       }
     }
@@ -344,21 +344,13 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
     }
   }
 
-  @deprecated("Use query2 instead, it is a generic interface for gets or scans", "0.1.24")
-  def scan = new ScanQuery(this)
-
-  @deprecated("Use query2 instead", "0.1.24")
-  def query = new Query(this)
-
   def query2 = new Query2Builder(this)
-
 
   def put(key: R, writeToWAL: Boolean = true) = new PutOp(this, keyConverter.toBytes(key))
 
   def delete(key: R) = new DeleteOp(this, keyConverter.toBytes(key))
 
   def increment(key: R) = new IncrementOp(this, keyConverter.toBytes(key))
-
 
   def init() {
     famLookup = Array.ofDim[Array[Byte]](families.size)
