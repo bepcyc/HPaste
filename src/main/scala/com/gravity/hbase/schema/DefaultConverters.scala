@@ -15,7 +15,7 @@
   * limitations under the License.
   */
 
-package com.gravity.hbase
+package com.gravity.hbase.schema
 
 import org.apache.hadoop.hbase.util.Bytes
 import scala.collection._
@@ -34,7 +34,7 @@ trait AnyConverterSignal
 /**
   * This is the standard set of types that can be auto converted into hbase values (they work as families, columns, and values)
   */
-package object schema {
+object DefaultConverters {
 
   def toBytesWritable[T](item: T)(implicit c: ByteConverter[T]) = {
     c.toBytesWritable(item)

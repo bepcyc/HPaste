@@ -14,7 +14,6 @@ import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable
 
-import com.gravity.hbase.AnyConverterSignal
 
 /*             )\._.,--....,'``.
  .b--.        /;   _.. \   _\  (`._ ,.
@@ -111,35 +110,24 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
    *
    */
   def converterByBytes(famBytes: Array[Byte], colBytes: Array[Byte]): KeyValueConvertible[_, _, _] = {
-
     if (colFamLookup.length == 0 || famLookup.length == 0) {
       throw new RuntimeException("Attempting to lookup 0 length columns and families--HBaseTable is corrupt")
     }
-
     val fullKey = ArrayUtils.addAll(famBytes, colBytes)
     val resIdx = Arrays.binarySearch(colFamLookup, fullKey, bc)
-    if (resIdx > -1) {
-      colFamIdx(resIdx)
-    } else {
+
+    if (resIdx > -1) colFamIdx(resIdx)
+    else {
       val resFamIdx = Arrays.binarySearch(famLookup, famBytes, bc)
-      if (resFamIdx > -1) {
-        famIdx(resFamIdx)
-      }
-      else {
-        null
-      }
+
+      if (resFamIdx > -1) famIdx(resFamIdx) else null
     }
-
-
   }
-
 
   /**Converts a result to a DeserializedObject. A conservative implementation that is slower than convertResultRaw but will always be more stable against
    * binary changes to Hbase's KeyValue format.
    */
-  def convertResult(result: Result) = {
-    convertResultRaw(result)
-  }
+  def convertResult(result: Result) = convertResultRaw(result)
 
   /**
    *
@@ -147,39 +135,28 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
    * @return
    */
   def convertResultRaw(result: Result) = {
-    val bytes = new Bytes()
-    val cellValues = result.rawCells();
-
-
-
-
-    var ds: DeserializedResult = null
+    val cellValues = result.rawCells()
     val rowId = keyConverter.fromBytes(result.getRow).asInstanceOf[AnyRef]
-    ds = DeserializedResult(rowId, families.size)
+    var ds = DeserializedResult(rowId, families.size)
 
     for (cell <- cellValues) {
       try {
-        val f = CellUtil.cloneFamily(cell)
-        val r = CellUtil.cloneValue(cell)
-        val c = converterByBytes(f,r)
-        val q = CellUtil.cloneQualifier(cell)
+        val family = CellUtil.cloneFamily(cell)
+        val qualifier = CellUtil.cloneQualifier(cell)
+        val value = CellUtil.cloneValue(cell)
+        val c = converterByBytes(family, qualifier)
 
-        val rNew = c.valueConverter.fromBytes(r, 0, r.length).asInstanceOf[AnyRef]
-        val qNew = c.keyConverter.fromBytes(q, 0, q.length).asInstanceOf[AnyRef]
+        val column = c.keyConverter.fromBytes(qualifier, 0, qualifier.length).asInstanceOf[AnyRef]
+        val content = c.valueConverter.fromBytes(value, 0, value.length).asInstanceOf[AnyRef]
+        val timestamp = cell.getTimestamp()
 
-        val ts = cell.getTimestamp()
-        // println("Adding value " + rNew)
-        ds.add(c.family, qNew, rNew, ts)
+        ds.add(c.family, column, content, timestamp)
       } catch {
-        case ex: Exception => {
-          println("Adding error buffer")
-          ex.printStackTrace
-        }
+        case ex: Exception => println("Adding error buffer")
       }
     }
     ds
   }
-
 
   def familyBytes = families.map(family => family.familyBytes)
 
@@ -201,7 +178,6 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
     columns.foreach {col => arr(col.columnIndex) = col}
     arr
   }
-
 
   //alter 'articles', NAME => 'html', VERSIONS =>1, COMPRESSION=>'lzo'
 
@@ -316,7 +292,6 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
     }
   }
 
-
   def withTableOption[Q](name: String)(work: (Option[HTableInterface]) => Q): Q = {
     val table = getTableOption(name)
     try {
@@ -344,7 +319,7 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
     }
   }
 
-  def query2 = new Query2Builder(this)
+  def query = new QueryBuilder(this)
 
   def put(key: R, writeToWAL: Boolean = true) = new PutOp(this, keyConverter.toBytes(key))
 

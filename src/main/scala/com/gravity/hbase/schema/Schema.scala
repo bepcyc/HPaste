@@ -33,7 +33,6 @@ import org.apache.commons.lang.ArrayUtils
 import java.util.{Arrays, HashMap}
 import org.apache.hadoop.hbase.util.Bytes.ByteArrayComparator
 import org.apache.hadoop.hbase.{HColumnDescriptor, KeyValue}
-import com.gravity.hbase.{AnyConverterSignal, AnyNotSupportedException}
 
 /*             )\._.,--....,'``.
 .b--.        /;   _.. \   _\  (`._ ,.

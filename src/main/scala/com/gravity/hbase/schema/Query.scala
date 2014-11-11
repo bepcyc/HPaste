@@ -427,21 +427,21 @@ trait MinimumFiltersToExecute[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]] {
 
   this: BaseQuery[T, R, RR] =>
 
-  def withFamilies[F](firstFamily: (T) => ColumnFamily[T, R, F, _, _], familyList: ((T) => ColumnFamily[T, R, F, _, _])*): Query2[T, R, RR]
+  def withFamilies[F](firstFamily: (T) => ColumnFamily[T, R, F, _, _], familyList: ((T) => ColumnFamily[T, R, F, _, _])*): Query[T, R, RR]
 
-  def withColumnsInFamily[F, K, V](family: (T) => ColumnFamily[T, R, F, K, V], firstColumn: K, columnList: K*): Query2[T, R, RR]
+  def withColumnsInFamily[F, K, V](family: (T) => ColumnFamily[T, R, F, K, V], firstColumn: K, columnList: K*): Query[T, R, RR]
 
   @deprecated("withColumnsInFamily can select one or more columns from a single family", "0.1.24")
-  def withColumn[F, K, V](family: (T) => ColumnFamily[T, R, F, K, V], columnName: K): Query2[T, R, RR]
+  def withColumn[F, K, V](family: (T) => ColumnFamily[T, R, F, K, V], columnName: K): Query[T, R, RR]
 
   @deprecated("withColumns can select one or more columns", "0.1.24")
-  def withColumn[F, K, V](column: (T) => Column[T, R, F, K, V]): Query2[T, R, RR]
+  def withColumn[F, K, V](column: (T) => Column[T, R, F, K, V]): Query[T, R, RR]
 
-  def withColumns[F, K, V](firstColumn: (T) => Column[T, R, F, _, _], columnList: ((T) => Column[T, R, F, _, _])*): Query2[T, R, RR]
+  def withColumns[F, K, V](firstColumn: (T) => Column[T, R, F, _, _], columnList: ((T) => Column[T, R, F, _, _])*): Query[T, R, RR]
 
 }
 
-class Query2[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]] private(
+class Query[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]] private(
                                                                                 override val table: HbaseTable[T, R, RR],
                                                                                 override val keys: Buffer[Array[Byte]],
                                                                                 override val families: Buffer[Array[Byte]],
@@ -908,7 +908,7 @@ class Query2[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]] private(
 
 }
 
-object Query2 {
+object Query {
   def p(depth: Int = 1, msg: Any) {
     println(("\t" * depth) + msg)
   }
