@@ -7,34 +7,32 @@ HPaste unlocks the rich functionality of HBase for a Scala audience. In so doing
 * Provide a strong, clear syntax for querying and filtration
 * Perform as fast as possible while maintaining idiomatic Scala client code -- the abstractions should not show up in a profiler!
 * Re-articulate HBase's data structures rather than force it into an ORM-style atmosphere.
-* A rich set of base classes for writing MapReduce jobs in hadoop against HBase tables.
-* Provide a maximum amount of code re-use between general Hbase client usage, and operation from within a MapReduce job.
 * Use Scala's type system to its advantage--the compiler should verify the integrity of the schema.
 * Be a verbose DSL--minimize boilerplate code, but be human readable!
 
-### What isn't HPaste?
-
-You'll notice that HPaste has a lot of convenience classes for MapReduce jobs.  This is to make it painless to use your domain objects and tables in the context of MR jobs. HPaste has no aspirations to replace tuple-based frameworks like Pig or Cascading (both of which we use for complex log parsing).  HPaste is intended to hug the Hadoop MapReduce API very closely, building convenience functions where necessary, without abstracting too far away from the base concept.
-
-The goal of HPaste's MapReduce support is to allow you to build rich functionality into your Table and Row objects, and make it be painless to have those tables and rows participate in MapReduce jobs.  Oftentimes in HBase you have a combination of OLTP style operations (client gets data, client serves data), and OLAP style operations (pivot one table around a particular piece of data, and output to another table).  That is where HPaste comes in handy, because there is often an impedance in Pig and/or Cascading between HBase-friendly binary data serialized objects and the tuple framework that makes those libraries so awesome to use for ad-hoc log-style data.
-
-(It is a mini-goal of HPaste to integrate into Cascading's tuple framework.)
-
 ## Project Status
-This project is currently actively developed and maintained.  It is used in a large production codebase in high-throughput, memory-intensive scenarios, and has many months of bug fixes under its belt.  Because it already has a great deal of code utilizing it, there will not be many breaking changes to the API.  Instead what we usually do is provide an upgraded API that sits next to the old API, then deprecate the old one.
+
+This project was originally developed by [Gravity](http://www.gravity.com/). This is a fork done by Unicredit R&D team to support recent distributions of Cloudera CDH.
+
+This project is currently actively developed and maintained. Tests are currently missing because of cleanup and refactoring, but it is a priority for us to add them again, as well as support recent development in HBase.
 
 ## Installation
 
-This project uses [sbt](http://www.scala-sbt.org/). To use HPaste in your own sbt project, simply add it as a dependency:
+This project uses [sbt](http://www.scala-sbt.org/). To use HPaste in your own sbt project, you can publish it locally, then simply add it as a dependency:
 
-    "com.gravity" %% "hpaste" % "0.1.26-CDH5.1.3"
+    libraryDependencies += "com.gravity" %% "hpaste" % "0.1.26-CDH5.1.3"
+
+The current version is built for Cloudera CDH 5.1.3, so you will need the Cloudera repositories
+
+    resolvers += "Cloudera releases" at "https://repository.cloudera.com/artifactory/libs-release"
 
 ## Quickstart
 
 Here's some quick code examples to give you a sense of what you're getting into.  All of the examples in the sections below come from the HPaste unit tests.  Specifically the file [WebCrawlSchemaTest.scala](https://github.com/GravityLabs/HPaste/blob/master/src/test/scala/com/gravity/hbase/schema/WebCrawlSchemaTest.scala).  If you go to that file and follow along with the explanations below, things will make more sense.
 
 #### Creating a WebTable
-The classic case for HBase and BigTable is crawling and storing web pages.  You need to define a WebTable for your crawling.  The below defines a table called WebTable, with a String key.
+
+The classic case for HBase and BigTable is crawling and storing web pages. You need to define a WebTable for your crawling. The below defines a table called WebTable, with a String key.
 
 * It has a column family called "meta", that holds columns with String keys and Any value-type.
 * It then specifies that the "meta" family holds a "title" column, a "lastCrawled" column, and a "url" column.
