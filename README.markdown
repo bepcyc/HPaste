@@ -14,26 +14,20 @@ HPaste unlocks the rich functionality of HBase for a Scala audience. In so doing
 
 ### What isn't HPaste?
 
-You'll notice that HPaste has a lot of convenience classes for MapReduce jobs.  This is to make it painless to use your domain objects and tables in the context of MR jobs. HPaste has no aspirations to replace tuple-based frameworks like Pig or Cascading (both of which we use for complex log parsing).  HPaste is intended to hug the Hadoop MapReduce API very closely, building convenience functions where necessary, without abstracting too far away from the base concept.  
+You'll notice that HPaste has a lot of convenience classes for MapReduce jobs.  This is to make it painless to use your domain objects and tables in the context of MR jobs. HPaste has no aspirations to replace tuple-based frameworks like Pig or Cascading (both of which we use for complex log parsing).  HPaste is intended to hug the Hadoop MapReduce API very closely, building convenience functions where necessary, without abstracting too far away from the base concept.
 
 The goal of HPaste's MapReduce support is to allow you to build rich functionality into your Table and Row objects, and make it be painless to have those tables and rows participate in MapReduce jobs.  Oftentimes in HBase you have a combination of OLTP style operations (client gets data, client serves data), and OLAP style operations (pivot one table around a particular piece of data, and output to another table).  That is where HPaste comes in handy, because there is often an impedance in Pig and/or Cascading between HBase-friendly binary data serialized objects and the tuple framework that makes those libraries so awesome to use for ad-hoc log-style data.
 
 (It is a mini-goal of HPaste to integrate into Cascading's tuple framework.)
 
 ## Project Status
-This project is currently actively developed and maintained.  It is used in a large production codebase in high-throughput, memory-intensive scenarios, and has many months of bug fixes under its belt.  Because it already has a great deal of code utilizing it, there will not be many breaking changes to the API.  Instead what we usually do is provide an upgraded API that sits next to the old API, then deprecate the old one.  
+This project is currently actively developed and maintained.  It is used in a large production codebase in high-throughput, memory-intensive scenarios, and has many months of bug fixes under its belt.  Because it already has a great deal of code utilizing it, there will not be many breaking changes to the API.  Instead what we usually do is provide an upgraded API that sits next to the old API, then deprecate the old one.
 
 ## Installation
 
-This project uses [Maven](http://maven.apache.org/ "Apache Maven"). To use HPaste in your own maven project, simply add it as a dependency:
+This project uses [sbt](http://www.scala-sbt.org/). To use HPaste in your own sbt project, simply add it as a dependency:
 
-```xml
-<dependency>
-  <groupId>com.gravity</groupId>
-  <artifactId>gravity-hpaste</artifactId>
-  <version>0.1.11</version>
-</dependency>
-```
+    "com.gravity" %% "hpaste" % "0.1.26-CDH5.1.3"
 
 ## Quickstart
 
@@ -89,10 +83,10 @@ WebCrawlingSchema.WebTable
 
 #### Querying values out of the WebTable
 
-Let's get the above page out of the WebTable.  Let's say we just want the title of the page and when it was last crawled.  The withColumns() call tells HBase to only fetch those columns.  It takes a series of functions that return the column values you specified in the WebTable, so you get compile-time checking on that.  
+Let's get the above page out of the WebTable.  Let's say we just want the title of the page and when it was last crawled.  The withColumns() call tells HBase to only fetch those columns.  It takes a series of functions that return the column values you specified in the WebTable, so you get compile-time checking on that.
 
 ```scala
-WebCrawlingSchema.WebTable.query2.withKey("http://mycrawledsite.com/crawledpage.html")
+WebCrawlingSchema.WebTable.query.withKey("http://mycrawledsite.com/crawledpage.html")
             .withColumns(_.title, _.lastCrawled)
             .withFamilies(_.searchMetrics)
             .singleOption() match {
@@ -114,99 +108,19 @@ WebCrawlingSchema.WebTable.query2.withKey("http://mycrawledsite.com/crawledpage.
 
 The result you get back is an instance of the row class you specified against the WebTable: WebPageRow.  When you get a WebPageRow back from a query, a scan, or a map reduce job, you can fetch the columns out via the column() call.  If you asked for a column family that can be treated as a Map (a Column Family that does not have columns specified in it), then you can retrieve the map via the family() call.
 
-#### Aggregating values via MapReduce jobs
-
-HPaste contains support for low-level MapReduce operations.  What we mean by low-level is that there are not many layers of abstraction on top of a basic MR job--instead, we focus on making it easy to create and manage table inputs and outputs and serialize binary data between them.
-
-Let's say we have a lot of pages crawled, and we, as a search engine, have searches people have performed for those pages.  We now want to roll those into per-site totals.  Let's create a table next to our WebTable called the SiteMetricsTable:
-
-```scala
-class SiteMetricsTable extends HbaseTable[SiteMetricsTable, String, SiteMetricsRow](tableName = "site-metrics", rowKeyClass = classOf[String]) {
-    def rowBuilder(result: DeserializedResult) = new SiteMetricsRow(this, result)
-
-    val meta = family[String, String, Any]("meta")
-    val name = column(meta, "name", classOf[String])
-
-    val searchMetrics = family[String, DateMidnight, Long]("searchesByDay")
-}
-
-class SiteMetricsRow(table: SiteMetricsTable, result: DeserializedResult) extends HRow[SiteMetricsTable, String](result, table)
-
-val Sites = table(new SiteMetricsTable)
-
-```
-
-Now we'll make a MapReduce job that scans the WebPages table, aggregates its metrics, and writes them to the SiteMetricsTable:
-
-```scala
-class WebSearchAggregationJob extends HJob[NoSettings]("Aggregate web searches by site",
-  HMapReduceTask(
-    HTaskID("Aggregation task"),
-    HTaskConfigs(),
-    HIO(
-      HTableInput(WebCrawlingSchema.WebTable),
-      HTableOutput(WebCrawlingSchema.Sites)
-    ),
-    new FromTableBinaryMapperFx(WebCrawlingSchema.WebTable) {
-      val webPage = row
-      val domain = new URL(webPage.rowid).getAuthority
-      ctr("Sites for domain" + domain)
-
-      val dates = webPage.family(_.searchMetrics)
-
-      for((dateOfSearches,searchCount) <- dates) {
-        val keyOutput = makeWritable{keyWriter=>
-          keyWriter.writeUTF(domain)
-          keyWriter.writeObj(dateOfSearches)
-        }
-        val valueOutput = makeWritable{valueWriter=>
-          valueWriter.writeLong(searchCount)
-        }
-        ctr("Dated metrics written for domain " + domain)
-        write(keyOutput, valueOutput)
-      }
-    },
-    new ToTableBinaryReducerFx(WebCrawlingSchema.Sites) {
-      val (domain, dateOfSearches) = readKey{keyInput=>
-        (keyInput.readUTF(), keyInput.readObj[DateMidnight])
-      }
-
-      var totalCounts = 0l
-
-      perValue{valueInput=>
-        totalCounts += valueInput.readLong
-      }
-
-
-      write(
-        WebCrawlingSchema.Sites.put(domain).valueMap(_.searchMetrics,Map(dateOfSearches->totalCounts))
-      )
-    }
-  )
-)
-
-```
-The above is a self-contained MapReduce job that is ready to go.  We can execute the above job via (where the Configuration object is the one relevant to your clsuter):
-
-```scala
-new WebSearchAggregationJob().run(Settings.None, LocalCluster.getTestConfiguration)
-```
-
-All of the above examples are part of the HPaste unit tests, so it should be easy to use them to set up your own system.  
+All of the above examples are part of the HPaste unit tests, so it should be easy to use them to set up your own system.
 
 ## Features not covered in the Quickstart
-There are many features not included in the Quickstart that exist in the codebase.  
+There are many features not included in the Quickstart that exist in the codebase.
 
 * Complex type serialization
-* Chaining map reduce jobs
 * Scanners and the filtration DSL
-* Settings classes that can be injected into MapReduce jobs
 
 # Building and Testing HPaste
-This project is put together with Maven.  In theory you should be able to build and run the project's tests via:
+This project is put together with sbt.  In theory you should be able to build and run the project's tests via:
 
 ``
-mvn test
+sbt test
 ``
 
 The tests will create a temporary hbase cluster, create temporary tables, and run map reduce jobs against those tables.  The unit tests are the best way to encounter HPaste, because they are constantly added to and perform live operations against a real cluster, so there's no smoke-and-mirrors.
@@ -281,7 +195,7 @@ If you have an existing table in HBase with the same name and families, you can 
 Paste the results into your hbase shell to create the table.
 
 ## Data Manipulation
-HPaste supports GETS, PUTS, and INCREMENTS.  You can batch multiple operations together, or do them serially.  
+HPaste supports GETS, PUTS, and INCREMENTS.  You can batch multiple operations together, or do them serially.
 
 ### Column Valued Operations
 Column valued operations are ops that work against a particular column.  Rather like a RDBMS.
@@ -422,57 +336,6 @@ Assuming the examples under the DATA MANIPULATION section, the following will re
     val dayViewsRes = ExampleSchema.ExampleTable.query.withKey(key).withColumnFamily(_.viewCountsByDay).single()
     val dayViewsMap = dayViewsRes.family(_.viewCountsByDay)
 ```
-
-# More on MapReduce support
-
-## Row Serialization between Mappers and Reducers
-
-HRows can be serialized between Mappers and Reducers, using the writeRow and readRow methods of PrimitiveOutputStream and PrimitiveInputStream.
-
-This is often the least performant way of passing data between mappers and reducers (depending on how big your rows are), but also involves the least amount of code.
-
-Below is a job that assumes the same WebCrawling schema in the Quickstart.  Its goal is to write output files that show page by the site they're contained in.  We've added a convenience function to the WebPageRow to extract the domain:
-
-```scala
-  class WebPageRow(table: WebTable, result: DeserializedResult) extends HRow[WebTable, String](result, table) {
-    def domain = new URL(rowid).getAuthority
-  }
-```
-
-Here is the job.  
-
-```scala
-class WebTablePagesBySiteJob extends HJob[NoSettings]("Get articles by site",
-  HMapReduceTask(
-    HTaskID("Articles by Site"),
-    HTaskConfigs(),
-    HIO(
-      HTableInput(WebCrawlingSchema.WebTable),
-      HPathOutput("/reports/wordcount")
-    ),
-    new FromTableBinaryMapperFx(WebCrawlingSchema.WebTable) {
-      val webPage : WebPageRow = row //For illustrative purposes we're specifying the type here, no need to
-      val domain = row.domain //We've added a convenience method to WebPageRow to extract the domain for us
-
-      write(
-      {keyOutput=>keyOutput.writeUTF(domain)}, //This writes out the domain as the key
-      {valueOutput=>valueOutput.writeRow(WebCrawlingSchema.WebTable,webPage)} //This writes the entire value of the row out
-      )
-    },
-    new BinaryToTextReducerFx {
-      val domain = readKey(_.readUTF()) //This allows you to read out the key
-
-      perValue{valueInput=>
-        val webPage : WebPageRow = valueInput.readRow(WebCrawlingSchema.WebTable) //Now you can read out the entire WebPageRow object from the value stream
-        ctr("Pages for domain " + domain)
-        writeln(domain + "\t" + webPage.column(_.title).getOrElse("No Title")) //This is a convenience function that writes a line to the text output
-      }
-    }
-  )
-)
-
-```
-This job is part of HPaste's unit tests, so you can see it in context at [WebCrawlSchemaTest.scala](https://github.com/GravityLabs/HPaste/blob/master/src/test/scala/com/gravity/hbase/schema/WebCrawlSchemaTest.scala).
 
 # Developers
 
