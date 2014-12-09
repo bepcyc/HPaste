@@ -1,8 +1,8 @@
 package com.gravity.hbase.schema
 
 import scala.collection.mutable.Buffer
-import org.apache.hadoop.hbase.client.Increment
 import scala.collection.Map
+import org.apache.hadoop.hbase.client.{ Increment, Durability }
 
 /*             )\._.,--....,'``.
  .b--.        /;   _.. \   _\  (`._ ,.
@@ -18,7 +18,7 @@ import scala.collection.Map
  */
 class IncrementOp[T <: HbaseTable[T, R, _], R](table: HbaseTable[T, R, _], key: Array[Byte], previous: Buffer[OpBase[T, R]] = Buffer[OpBase[T, R]]()) extends OpBase[T, R](table, key, previous) {
   val increment = new Increment(key)
-  increment.setWriteToWAL(false)
+  increment.setDurability(Durability.SKIP_WAL)
 
   def +(that: OpBase[T, R]) = new IncrementOp(table,key, previous ++ that.previous)
 

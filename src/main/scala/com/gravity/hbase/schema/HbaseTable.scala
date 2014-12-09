@@ -67,26 +67,28 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
     rowBuilder(convertResult(result))
   }
 
+  val connection = HConnectionManager.createConnection(conf)
+
   /**A pool of table objects with AutoFlush set to true */
-  val tablePool = new HTablePool(conf, tableConfig.tablePoolSize)
+  // val tablePool = new HTablePool(conf, tableConfig.tablePoolSize)
 
   /**A pool of table objects with AutoFlush set to false --therefore usable for asynchronous write buffering */
-  val bufferTablePool = new HTablePool(conf, 1, new HTableInterfaceFactory {
-    def createHTableInterface(config: Configuration, tableName: Array[Byte]): HTableInterface = {
-      val table = new HTable(conf, tableName)
-      table.setWriteBufferSize(2000000L)
-      table.setAutoFlush(false)
-      table
-    }
+  // val bufferTablePool = new HTablePool(conf, 1, new HTableInterfaceFactory {
+  //   def createHTableInterface(config: Configuration, tableName: Array[Byte]): HTableInterface = {
+  //     val table = new HTable(conf, tableName)
+  //     table.setWriteBufferSize(2000000L)
+  //     table.setAutoFlush(false, true)
+  //     table
+  //   }
 
-    def releaseHTableInterface(table: HTableInterface) {
-      try {
-        table.close()
-      } catch {
-        case ex: IOException => throw new RuntimeException(ex)
-      }
-    }
-  })
+  //   def releaseHTableInterface(table: HTableInterface) {
+  //     try {
+  //       table.close()
+  //     } catch {
+  //       case ex: IOException => throw new RuntimeException(ex)
+  //     }
+  //   }
+  // })
 
 
   @volatile var famLookup: Array[Array[Byte]] = null
@@ -245,9 +247,14 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
   }
 
 
-  def getTable(name: String) = tablePool.getTable(name)
+  def getTable(name: String) = connection.getTable(name)
 
-  def getBufferedTable(name: String) = bufferTablePool.getTable(name)
+  def getBufferedTable(name: String) = {
+    val table = getTable(name)
+    table.setWriteBufferSize(2000000L)
+    table.setAutoFlush(false, true)
+    table
+  }
 
   private val columns = ArrayBuffer[Column[T, R, _, _, _]]()
   val families = ArrayBuffer[ColumnFamily[T, R, _, _, _]]()
@@ -297,7 +304,7 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
     try {
       work(table)
     } finally {
-      table foreach (tbl => tablePool.putTable(tbl))
+      table foreach (_.close())
     }
   }
 
@@ -306,7 +313,7 @@ abstract class HbaseTable[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]](val ta
     try {
       work(table)
     } finally {
-      bufferTablePool.putTable(table)
+      table.close()
     }
   }
 

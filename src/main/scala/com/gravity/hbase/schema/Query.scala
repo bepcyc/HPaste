@@ -880,10 +880,6 @@ class Query[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]] private(
     results2
   }
 
-  trait Stopable extends Throwable
-
-  object YouCanStopNow extends Stopable
-
   /**Similar to the scan method but if your handler returns false, it will stop scanning.
    *
    */
@@ -893,16 +889,10 @@ class Query[T <: HbaseTable[T, R, RR], R, RR <: HRow[T, R]] private(
         val scan = makeScanner(maxVersions, cacheBlocks, cacheSize)
 
         val scanner = htable.getScanner(scan)
+        val rows = scanner.iterator map { result => table.buildRow(result) }
 
-        try {
-          for (result <- scanner) {
-            if (!handler(table.buildRow(result))) throw YouCanStopNow
-          }
-        } catch {
-          case _: Stopable => // nothing to see here... move along. move along.
-        } finally {
-          scanner.close()
-        }
+        for (row <- rows takeWhile { r => ! handler(r) }) {}
+        scanner.close()
     }
   }
 

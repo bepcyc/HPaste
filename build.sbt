@@ -6,7 +6,7 @@ organizationName := "Gravity"
 
 organizationHomepage := Some(url("http://www.gravity.com"))
 
-version := "0.1.26-CDH5.1.3"
+version := "0.1.27-CDH5.1.3"
 
 licenses := Seq("Apache2" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
 

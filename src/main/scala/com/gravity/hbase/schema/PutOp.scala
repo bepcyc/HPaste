@@ -1,9 +1,10 @@
 package com.gravity.hbase.schema
 
 import scala.collection.mutable.Buffer
+import scala.collection.Map
 import org.apache.hadoop.hbase.client.Put
 import org.joda.time.DateTime
-import scala.collection.Map
+import org.apache.hadoop.hbase.client.Durability
 
 /*             )\._.,--....,'``.
  .b--.        /;   _.. \   _\  (`._ ,.
@@ -20,7 +21,7 @@ import scala.collection.Map
  */
 class PutOp[T <: HbaseTable[T, R, _], R](table: HbaseTable[T, R, _], key: Array[Byte], previous: Buffer[OpBase[T, R]] = Buffer[OpBase[T, R]](), writeToWAL: Boolean = true) extends OpBase[T, R](table, key, previous) {
   val put = new Put(key)
-  put.setWriteToWAL(writeToWAL)
+  if (writeToWAL) put.setDurability(Durability.SYNC_WAL) else put.setDurability(Durability.SKIP_WAL)
 
 
   def +(that: OpBase[T, R]) = new PutOp(table,key, previous ++ that.previous, writeToWAL)
