@@ -6,7 +6,7 @@ organizationName := "Gravity"
 
 organizationHomepage := Some(url("http://www.gravity.com"))
 
-version := "0.1.27-CDH5.3.1"
+version := "0.1.27-CDH5.3.2"
 
 licenses := Seq("Apache2" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
 
@@ -28,9 +28,9 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "joda-time" % "joda-time" % "1.6.2", // "2.5",
-  "org.apache.hadoop" % "hadoop-client" % "2.5.0-mr1-cdh5.3.1",
-  "org.apache.hbase" % "hbase-common" % "0.98.6-cdh5.3.1" exclude("org.jruby", "jruby-complete"),
-  "org.apache.hbase" % "hbase-client" % "0.98.6-cdh5.3.1" exclude("org.jruby", "jruby-complete"),
+  "org.apache.hadoop" % "hadoop-client" % "2.5.0-mr1-cdh5.3.2",
+  "org.apache.hbase" % "hbase-common" % "0.98.6-cdh5.3.2" exclude("org.jruby", "jruby-complete"),
+  "org.apache.hbase" % "hbase-client" % "0.98.6-cdh5.3.2" exclude("org.jruby", "jruby-complete"),
   "net.sf.trove4j" % "trove4j" % "3.0.3"
 )
 
