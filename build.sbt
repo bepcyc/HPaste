@@ -12,7 +12,7 @@ licenses := Seq("Apache2" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt
 
 homepage := Some(url("https://github.com/GravityLabs/HPaste"))
 
-scalaVersion := "2.11.6"
+scalaVersion := "2.10.4"
 
 scalacOptions ++= Seq(
   "-deprecation",
